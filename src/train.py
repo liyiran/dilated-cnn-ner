@@ -4,14 +4,14 @@ import sys
 import time
 import tensorflow as tf
 import numpy as np
-from data_utils import SeqBatcher, Batcher
-from cnn import CNN
-from bilstm import BiLSTM
-from bilstm_char import BiLSTMChar
-from cnn_char import CNNChar
-import eval_f1 as evaluation
+from src.data_utils import SeqBatcher as SeqBatcher, Batcher as Batcher
+from src.cnn import CNN as CNN
+from src.bilstm import BiLSTM as BiLSTM
+from src.bilstm_char import BiLSTMChar as BiLSTMChar
+from src.cnn_char import CNNChar as CNNChar
+import src.eval_f1 as evaluation
 import json
-import tf_utils
+import src.tf_utils as tf_utils
 from os import listdir
 import os
 
