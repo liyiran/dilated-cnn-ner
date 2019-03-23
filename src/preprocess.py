@@ -1,12 +1,10 @@
-from __future__ import absolute_import
-from __future__ import division
-from __future__ import print_function
+from __future__ import absolute_import, division, print_function
 
-import re
 import os
 import sys
-import tensorflow as tf
+
 import numpy as np
+import tensorflow as tf
 
 tf.app.flags.DEFINE_string('in_file', 'naacl-data.tsv', 'tsv file containing string data')
 tf.app.flags.DEFINE_string('vocab', '', 'file containing vocab (empty means make new vocab)')
@@ -32,7 +30,6 @@ tf.app.flags.DEFINE_boolean('update_maps', False, 'whether to update maps')
 
 tf.app.flags.DEFINE_string('update_vocab', '', 'file to update vocab with tokens from training data')
 
-
 FLAGS = tf.app.flags.FLAGS
 
 ZERO_STR = "<ZERO>"
@@ -55,7 +52,7 @@ label_int_str_map = {}
 token_int_str_map = {}
 char_int_str_map = {}
 
-pad_width = int(FLAGS.window_size/2)
+pad_width = int(FLAGS.window_size / 2)
 
 
 def _int64_feature(value): return tf.train.Feature(int64_list=tf.train.Int64List(value=value))
@@ -109,7 +106,6 @@ def make_example(writer, lines, label_map, token_map, shape_map, char_map, updat
 
     # max_len_with_pad = FLAGS.max_len if FLAGS.documents else FLAGS.max_len + (FLAGS.window_size - 1) # assumes odd window size
 
-
     oov_count = 0
     if sent_len == 0:
         return 0, 0, 0
@@ -121,7 +117,7 @@ def make_example(writer, lines, label_map, token_map, shape_map, char_map, updat
     # zero pad
     tokens = np.zeros(max_len_with_pad, dtype=np.int64)
     shapes = np.zeros(max_len_with_pad, dtype=np.int64)
-    chars = np.zeros(max_len_with_pad*max_word_len, dtype=np.int64)
+    chars = np.zeros(max_len_with_pad * max_word_len, dtype=np.int64)
     intmapped_labels = np.zeros(max_len_with_pad, dtype=np.int64)
     sent_lens = []
     tok_lens = []
@@ -139,7 +135,7 @@ def make_example(writer, lines, label_map, token_map, shape_map, char_map, updat
         chars[:pad_width] = char_map[PAD_STR]
         if FLAGS.predict_pad:
             intmapped_labels[:pad_width] = label_map[PAD_STR]
-    tok_lens.extend([1]*pad_width)
+    tok_lens.extend([1] * pad_width)
 
     last_label = "O"
     labels = []
@@ -177,7 +173,7 @@ def make_example(writer, lines, label_map, token_map, shape_map, char_map, updat
 
             token_str_normalized = token_str.lower() if FLAGS.lowercase else token_str
 
-            if token_shape not in shape_map:#  and update_vocab:
+            if token_shape not in shape_map:  # and update_vocab:
                 shape_map[token_shape] = len(shape_map)
 
             # token_str_normalized_char = re.sub(r'\W', '.', token_str_normalized)
@@ -212,8 +208,8 @@ def make_example(writer, lines, label_map, token_map, shape_map, char_map, updat
                     token_int_str_map[token_map[token_str_normalized]] = token_str_normalized
 
             tokens[idx] = token_map.get(token_str_normalized, token_map[OOV_STR])
-            shapes[idx] = shape_map[token_shape] # if update_vocab else shape_map.get(token_shape, shape_map[token_shape[0]])
-            chars[char_start:char_start+tok_lens[-1]] = [char_map.get(char, char_map[OOV_STR]) for char in token_str]
+            shapes[idx] = shape_map[token_shape]  # if update_vocab else shape_map.get(token_shape, shape_map[token_shape[0]])
+            chars[char_start:char_start + tok_lens[-1]] = [char_map.get(char, char_map[OOV_STR]) for char in token_str]
             char_start += tok_lens[-1]
             labels.append(label_bilou)
             last_label = label_bilou
@@ -225,21 +221,21 @@ def make_example(writer, lines, label_map, token_map, shape_map, char_map, updat
             current_sent_len = 0
 
             if FLAGS.start_end:
-                tokens[idx:idx+pad_width] = token_map[SENT_END]
-                shapes[idx:idx+pad_width] = shape_map[SENT_END]
-                chars[char_start:char_start+pad_width] = char_map[SENT_END]
+                tokens[idx:idx + pad_width] = token_map[SENT_END]
+                shapes[idx:idx + pad_width] = shape_map[SENT_END]
+                chars[char_start:char_start + pad_width] = char_map[SENT_END]
                 char_start += pad_width
                 tok_lens.extend([1] * pad_width)
                 labels.extend([SENT_END] * pad_width)
                 idx += pad_width
 
-                if i != len(lines)-1:
-                    tokens[idx:idx+pad_width] = token_map[SENT_START]
-                    shapes[idx:idx+pad_width] = shape_map[SENT_START]
+                if i != len(lines) - 1:
+                    tokens[idx:idx + pad_width] = token_map[SENT_START]
+                    shapes[idx:idx + pad_width] = shape_map[SENT_START]
                     chars[char_start:char_start + pad_width] = char_map[SENT_START]
                     char_start += pad_width
                     tok_lens.extend([1] * pad_width)
-                    labels.extend([SENT_START]*pad_width)
+                    labels.extend([SENT_START] * pad_width)
                     idx += pad_width
             else:
                 tokens[idx:idx + pad_width] = token_map[PAD_STR]
@@ -262,17 +258,17 @@ def make_example(writer, lines, label_map, token_map, shape_map, char_map, updat
 
     # final padding
     if not FLAGS.documents and FLAGS.start_end:
-        tokens[idx:idx+pad_width] = token_map[SENT_END]
-        shapes[idx:idx+pad_width] = shape_map[SENT_END]
-        chars[char_start:char_start+pad_width] = char_map[SENT_END]
+        tokens[idx:idx + pad_width] = token_map[SENT_END]
+        shapes[idx:idx + pad_width] = shape_map[SENT_END]
+        chars[char_start:char_start + pad_width] = char_map[SENT_END]
         char_start += pad_width
         tok_lens.extend([1] * pad_width)
         if FLAGS.predict_pad:
-            intmapped_labels[idx:idx+pad_width] = label_map[SENT_END]
+            intmapped_labels[idx:idx + pad_width] = label_map[SENT_END]
     elif not FLAGS.documents:
-        tokens[idx:idx+pad_width] = token_map[PAD_STR]
-        shapes[idx:idx+pad_width] = shape_map[PAD_STR]
-        chars[char_start:char_start+pad_width] = char_map[PAD_STR]
+        tokens[idx:idx + pad_width] = token_map[PAD_STR]
+        shapes[idx:idx + pad_width] = shape_map[PAD_STR]
+        chars[char_start:char_start + pad_width] = char_map[PAD_STR]
         char_start += pad_width
         tok_lens.extend([1] * pad_width)
         if FLAGS.predict_pad:
@@ -283,13 +279,13 @@ def make_example(writer, lines, label_map, token_map, shape_map, char_map, updat
             label_map[label] = len(label_map)
             label_int_str_map[label_map[label]] = label
 
-    intmapped_labels[pad_width:pad_width+len(labels)] = map(lambda s: label_map[s], labels)
+    intmapped_labels[pad_width:pad_width + len(labels)] = map(lambda s: label_map[s], labels)
 
     # chars = chars.flatten()
 
     # print(sent_lens)
 
-    padded_len = (2 if FLAGS.start_end else 1)*(len(sent_lens)+(0 if FLAGS.start_end else 1))*pad_width+sum(sent_lens)
+    padded_len = (2 if FLAGS.start_end else 1) * (len(sent_lens) + (0 if FLAGS.start_end else 1)) * pad_width + sum(sent_lens)
     intmapped_labels = intmapped_labels[:padded_len]
     tokens = tokens[:padded_len]
     shapes = shapes[:padded_len]
@@ -401,7 +397,6 @@ def tsv_to_examples():
     #                 # print("adding word %s" % word)
     #                 embedding_map[word] = len(embedding_map)
 
-
     # load vocab if we have one
     if FLAGS.vocab != '':
         update_vocab = False
@@ -495,7 +490,7 @@ def tsv_to_examples():
             make_example(writer, line_buf, label_map, token_map, shape_map, char_map, update_vocab, update_chars)
         writer.close()
 
-    print("Embeddings coverage: %2.2f%%" % ((1-(num_oov/num_tokens)) * 100))
+    print("Embeddings coverage: %2.2f%%" % ((1 - (num_oov / num_tokens)) * 100))
 
     # remove padding from label domain
     # filtered_label_map = label_map if FLAGS.predict_pad else \

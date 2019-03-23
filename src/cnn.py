@@ -1,7 +1,8 @@
-from __future__ import print_function
-from __future__ import division
-import tensorflow as tf
+from __future__ import division, print_function
+
 import numpy as np
+import tensorflow as tf
+
 import src.tf_utils as tf_utils
 
 
@@ -65,12 +66,12 @@ class CNN(object):
         if self.viterbi:
             self.transition_params = tf.get_variable("transitions", [num_classes, num_classes])
 
-        word_embeddings_shape = (vocab_size-1, embedding_size)
+        word_embeddings_shape = (vocab_size - 1, embedding_size)
         self.w_e = tf_utils.initialize_embeddings(word_embeddings_shape, name="w_e", pretrained=embeddings, old=False)
 
         self.block_unflat_scores, self.hidden_layer = self.forward(self.input_x1, self.input_x2, self.max_seq_len,
-                                          self.hidden_dropout_keep_prob,
-                                          self.input_dropout_keep_prob, self.middle_dropout_keep_prob, reuse=False)
+                                                                   self.hidden_dropout_keep_prob,
+                                                                   self.input_dropout_keep_prob, self.middle_dropout_keep_prob, reuse=False)
 
         # CalculateMean cross-entropy loss
         with tf.name_scope("loss"):
@@ -164,7 +165,7 @@ class CNN(object):
                 input_list.append(char_embeddings_masked)
                 input_size += self.char_size
             if self.use_shape:
-                shape_embeddings_shape = (self.shape_domain_size-1, self.shape_size)
+                shape_embeddings_shape = (self.shape_domain_size - 1, self.shape_size)
                 w_s = tf_utils.initialize_embeddings(shape_embeddings_shape, name="w_s")
                 shape_embeddings = tf.nn.embedding_lookup(w_s, input_x2)
                 input_list.append(shape_embeddings)
@@ -215,7 +216,7 @@ class CNN(object):
                         take_layer = layer['take']
                         if not reuse:
                             print("Adding layer %s: dilation: %d; width: %d; filters: %d; take: %r" % (
-                            layer_name, dilation, filter_width, num_filters, take_layer))
+                                layer_name, dilation, filter_width, num_filters, take_layer))
                         with tf.name_scope("atrous-conv-%s" % layer_name):
                             # [filter_height, filter_width, in_channels, out_channels]
                             filter_shape = [1, filter_width, inner_last_dims, num_filters]
@@ -252,7 +253,7 @@ class CNN(object):
                     def do_projection():
                         # Project raw outputs down
                         with tf.name_scope("projection"):
-                            projection_width = int(total_output_width/(2*len(hidden_outputs)))
+                            projection_width = int(total_output_width / (2 * len(hidden_outputs)))
                             w_p = tf_utils.initialize_weights([total_output_width, projection_width], "w_p", init_type="xavier")
                             b_p = tf.get_variable("b_p", initializer=tf.constant(0.01, shape=[projection_width]))
                             projected = tf.nn.xw_plus_b(h_drop, w_p, b_p, name="projected")
@@ -264,7 +265,7 @@ class CNN(object):
                     input_to_pred_drop = tf.nn.dropout(input_to_pred, middle_dropout_keep_prob) if self.projection else input_to_pred
 
                     # Final (unnormalized) scores and predictions
-                    with tf.name_scope("output"+block_name_suff):
+                    with tf.name_scope("output" + block_name_suff):
                         w_o = tf_utils.initialize_weights([proj_width, self.num_classes], "w_o", init_type="xavier")
                         b_o = tf.get_variable("b_o", initializer=tf.constant(0.01, shape=[self.num_classes]))
                         self.l2_loss += tf.nn.l2_loss(w_o)

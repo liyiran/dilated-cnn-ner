@@ -234,7 +234,8 @@ def make_example(writer, lines, label_map, token_map, shape_map, char_map, updat
             label_map[label] = len(label_map)
             label_int_str_map[label_map[label]] = label
 
-    intmapped_labels[pad_width:pad_width+len(labels)] = map(lambda s: label_map[s], labels)
+    # intmapped_labels[pad_width:pad_width+len(labels)] = map(lambda s: label_map[s], labels)
+    intmapped_labels[pad_width:pad_width+len(labels)] = [label_map[s] for s in labels]
 
     # chars = chars.flatten()
 

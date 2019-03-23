@@ -1,7 +1,7 @@
 #!/bin/bash
 
 conf=$1
-if [ ! -e $conf ]; then
+if [[ -z "$conf" ]]; then
     echo "No config file specified; Exiting."
     exit 1
 fi
@@ -19,6 +19,9 @@ lower_param=""
 if [[ "$lowercase" == "true" ]]; then
     lower_param="--lower"
 fi
+echo $output_dir
+echo $vocab_param
+echo $lower_param
 
 predict_pad_param=""
 if [[ "$predict_pad" == "true" ]]; then
@@ -75,7 +78,7 @@ for (( i=0; i < ${#data_files[@]}; i++)); do
 
     mkdir -p $this_output_dir
 
-    cmd="python $process_script \
+    cmd="python3 $process_script \
     --in_file $this_data_file \
     --out_dir $this_output_dir \
     --window_size $filter_width \

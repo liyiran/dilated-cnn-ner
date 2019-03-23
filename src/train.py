@@ -1,19 +1,21 @@
-from __future__ import division
-from __future__ import print_function
+from __future__ import division, print_function
+
+import json
+import os
 import sys
 import time
-import tensorflow as tf
+from os import listdir
+
 import numpy as np
-from src.data_utils import SeqBatcher as SeqBatcher, Batcher as Batcher
-from src.cnn import CNN as CNN
+import tensorflow as tf
+
+import src.eval_f1 as evaluation
+import src.tf_utils as tf_utils
 from src.bilstm import BiLSTM as BiLSTM
 from src.bilstm_char import BiLSTMChar as BiLSTMChar
+from src.cnn import CNN as CNN
 from src.cnn_char import CNNChar as CNNChar
-import src.eval_f1 as evaluation
-import json
-import src.tf_utils as tf_utils
-from os import listdir
-import os
+from src.data_utils import Batcher as Batcher, SeqBatcher as SeqBatcher
 
 FLAGS = tf.app.flags.FLAGS
 
@@ -30,7 +32,7 @@ def main(argv):
         sys.exit(1)
 
     # Doesn't work in newer versions of tf. TODO: fix
-    
+
     # print('\n'.join(sorted(["%s : %s" % (str(k), str(v)) for k, v in FLAGS.__dict__['__flags'].items()])))
 
     with open(maps_dir + '/label.txt', 'r') as f:
@@ -86,7 +88,7 @@ def main(argv):
 
     type_set = {}
     type_int_int_map = {}
-    outside_set = ["O", "<PAD>",  "<S>",  "</S>", "<ZERO>"]
+    outside_set = ["O", "<PAD>", "<S>", "</S>", "<ZERO>"]
     for label, id in labels_str_id_map.items():
         label_type = label if label in outside_set else label[2:]
         if label_type not in type_set:
@@ -95,7 +97,7 @@ def main(argv):
     print(type_set)
 
     # load embeddings, if given; initialize in range [-.01, .01]
-    embeddings_shape = (vocab_size-1, FLAGS.embed_dim)
+    embeddings_shape = (vocab_size - 1, FLAGS.embed_dim)
     embeddings = tf_utils.embedding_values(embeddings_shape, old=False)
     embeddings_used = 0
     if FLAGS.embeddings != '':
@@ -107,20 +109,20 @@ def main(argv):
                 if word in vocab_str_id_map:
                     embeddings_used += 1
                     # shift by -1 because we are going to add a 0 constant vector for the padding later
-                    embeddings[vocab_str_id_map[word]-1] = map(float, embedding)
+                    embeddings[vocab_str_id_map[word] - 1] = map(float, embedding)
                 elif word.lower() in vocab_str_id_map:
                     embeddings_used += 1
                     embeddings[vocab_str_id_map[word.lower()] - 1] = map(float, embedding)
-    print("Loaded %d/%d embeddings (%2.2f%% coverage)" % (embeddings_used, vocab_size, embeddings_used/vocab_size*100))
+    print("Loaded %d/%d embeddings (%2.2f%% coverage)" % (embeddings_used, vocab_size, embeddings_used / vocab_size * 100))
 
     layers_map = sorted(json.loads(FLAGS.layers.replace("'", '"')).items()) if FLAGS.model == 'cnn' else None
 
-    pad_width = int(layers_map[0][1]['width']/2) if layers_map is not None else 1
+    pad_width = int(layers_map[0][1]['width'] / 2) if layers_map is not None else 1
 
     with tf.Graph().as_default():
         train_batcher = Batcher(train_dir, FLAGS.batch_size) if FLAGS.memmap_train else SeqBatcher(train_dir, FLAGS.batch_size)
 
-        dev_batch_size = FLAGS.batch_size # num_dev_examples
+        dev_batch_size = FLAGS.batch_size  # num_dev_examples
         dev_batcher = SeqBatcher(dev_dir, dev_batch_size, num_buckets=0, num_epochs=1)
         if FLAGS.ontonotes:
             domain_dev_batchers = {domain: SeqBatcher(dev_dir.replace('*', domain),
@@ -130,45 +132,45 @@ def main(argv):
         train_eval_batch_size = FLAGS.batch_size
         train_eval_batcher = SeqBatcher(train_dir, train_eval_batch_size, num_buckets=0, num_epochs=1)
 
-        char_embedding_model = BiLSTMChar(char_domain_size, FLAGS.char_dim, int(FLAGS.char_tok_dim/2)) \
+        char_embedding_model = BiLSTMChar(char_domain_size, FLAGS.char_dim, int(FLAGS.char_tok_dim / 2)) \
             if FLAGS.char_dim > 0 and FLAGS.char_model == "lstm" else \
             (CNNChar(char_domain_size, FLAGS.char_dim, FLAGS.char_tok_dim, layers_map[0][1]['width'])
-                if FLAGS.char_dim > 0 and FLAGS.char_model == "cnn" else None)
+             if FLAGS.char_dim > 0 and FLAGS.char_model == "cnn" else None)
         char_embeddings = char_embedding_model.outputs if char_embedding_model is not None else None
 
         if FLAGS.model == 'cnn':
             model = CNN(
-                    num_classes=labels_size,
-                    vocab_size=vocab_size,
-                    shape_domain_size=shape_domain_size,
-                    char_domain_size=char_domain_size,
-                    char_size=FLAGS.char_tok_dim,
-                    embedding_size=FLAGS.embed_dim,
-                    shape_size=FLAGS.shape_dim,
-                    nonlinearity=FLAGS.nonlinearity,
-                    layers_map=layers_map,
-                    viterbi=FLAGS.viterbi,
-                    projection=FLAGS.projection,
-                    loss=FLAGS.loss,
-                    margin=FLAGS.margin,
-                    repeats=FLAGS.block_repeats,
-                    share_repeats=FLAGS.share_repeats,
-                    char_embeddings=char_embeddings,
-                    embeddings=embeddings)
+                num_classes=labels_size,
+                vocab_size=vocab_size,
+                shape_domain_size=shape_domain_size,
+                char_domain_size=char_domain_size,
+                char_size=FLAGS.char_tok_dim,
+                embedding_size=FLAGS.embed_dim,
+                shape_size=FLAGS.shape_dim,
+                nonlinearity=FLAGS.nonlinearity,
+                layers_map=layers_map,
+                viterbi=FLAGS.viterbi,
+                projection=FLAGS.projection,
+                loss=FLAGS.loss,
+                margin=FLAGS.margin,
+                repeats=FLAGS.block_repeats,
+                share_repeats=FLAGS.share_repeats,
+                char_embeddings=char_embeddings,
+                embeddings=embeddings)
         elif FLAGS.model == "bilstm":
             model = BiLSTM(
-                    num_classes=labels_size,
-                    vocab_size=vocab_size,
-                    shape_domain_size=shape_domain_size,
-                    char_domain_size=char_domain_size,
-                    char_size=FLAGS.char_dim,
-                    embedding_size=FLAGS.embed_dim,
-                    shape_size=FLAGS.shape_dim,
-                    nonlinearity=FLAGS.nonlinearity,
-                    viterbi=FLAGS.viterbi,
-                    hidden_dim=FLAGS.lstm_dim,
-                    char_embeddings=char_embeddings,
-                    embeddings=embeddings)
+                num_classes=labels_size,
+                vocab_size=vocab_size,
+                shape_domain_size=shape_domain_size,
+                char_domain_size=char_domain_size,
+                char_size=FLAGS.char_dim,
+                embedding_size=FLAGS.embed_dim,
+                shape_size=FLAGS.shape_dim,
+                nonlinearity=FLAGS.nonlinearity,
+                viterbi=FLAGS.viterbi,
+                hidden_dim=FLAGS.lstm_dim,
+                char_embeddings=char_embeddings,
+                embeddings=embeddings)
         else:
             print(FLAGS.model + ' is not a valid model type')
             sys.exit(1)
@@ -277,10 +279,10 @@ def main(argv):
 
                 # print evaluation
                 f1_micro, precision = evaluation.segment_eval(eval_batches, predictions, type_set, type_int_int_map,
-                                                   labels_id_str_map, vocab_id_str_map,
-                                                   outside_idx=map(lambda t: type_set[t] if t in type_set else type_set["O"], outside_set),
-                                                   pad_width=pad_width, start_end=FLAGS.start_end,
-                                                   extra_text="Segment evaluation %s:" % extra_text)
+                                                              labels_id_str_map, vocab_id_str_map,
+                                                              outside_idx=map(lambda t: type_set[t] if t in type_set else type_set["O"], outside_set),
+                                                              pad_width=pad_width, start_end=FLAGS.start_end,
+                                                              extra_text="Segment evaluation %s:" % extra_text)
 
                 return f1_micro, precision
 
@@ -302,15 +304,16 @@ def main(argv):
                         mask_batch = np.zeros(dev_token_batch.shape)
                         actual_seq_lens = np.add(np.sum(dev_seq_len_batch, axis=1),
                                                  (2 if FLAGS.start_end else 1) * pad_width * (
-                                                 (dev_seq_len_batch != 0).sum(axis=1) + (
-                                                 0 if FLAGS.start_end else 1)))
+                                                         (dev_seq_len_batch != 0).sum(axis=1) + (
+                                                     0 if FLAGS.start_end else 1)))
                         for i, seq_len in enumerate(actual_seq_lens):
                             mask_batch[i, :seq_len] = 1
                         batches.append((dev_label_batch, dev_token_batch, dev_shape_batch, dev_char_batch,
-                                            dev_seq_len_batch, dev_tok_len_batch, mask_batch))
+                                        dev_seq_len_batch, dev_tok_len_batch, mask_batch))
                     except:
                         done = True
                 return batches
+
             dev_batches = get_dev_batches(dev_batcher)
             if FLAGS.ontonotes:
                 domain_batches = {domain: get_dev_batches(domain_batcher)
@@ -355,15 +358,15 @@ def main(argv):
                             run_evaluation(train_batches, "TRAIN (iteration %d)" % training_iteration)
                         print()
                         f1_micro, precision = run_evaluation(dev_batches, "TEST (iteration %d)" % training_iteration)
-                        print("Avg training speed: %f examples/second" % (speed_num/speed_denom))
+                        print("Avg training speed: %f examples/second" % (speed_num / speed_denom))
 
                         # keep track of running best / convergence heuristic
                         if f1_micro > best_score:
                             best_score = f1_micro
                             num_lower = 0
                             if FLAGS.model_dir != '' and best_score > FLAGS.save_min:
-                                    save_path = saver.save(sess, FLAGS.model_dir + ".tf")
-                                    print("Serialized model: %s" % save_path)
+                                save_path = saver.save(sess, FLAGS.model_dir + ".tf")
+                                print("Serialized model: %s" % save_path)
                         else:
                             num_lower += 1
                         if num_lower > max_lower and training_iteration > min_iters:
@@ -376,7 +379,7 @@ def main(argv):
                         start_time = time.time()
 
                     if examples > log_every_running:
-                        speed_denom += time.time()-start_time
+                        speed_denom += time.time() - start_time
                         speed_num += examples
                         evaluation.print_training_error(examples, start_time, [epoch_loss], train_batcher._step)
                         log_every_running += log_every
@@ -400,7 +403,7 @@ def main(argv):
                     max_sentences = max(map(len, seq_len_batch))
                     new_seq_len_batch = np.zeros((batch_size, max_sentences))
                     for i, seq_len_list in enumerate(seq_len_batch):
-                        new_seq_len_batch[i,:len(seq_len_list)] = seq_len_list
+                        new_seq_len_batch[i, :len(seq_len_list)] = seq_len_list
                     seq_len_batch = new_seq_len_batch
                     num_sentences_batch = np.sum(seq_len_batch != 0, axis=1)
 
@@ -427,21 +430,21 @@ def main(argv):
 
                     if FLAGS.model == "cnn":
                         cnn_feeds = {
-                                model.input_x1: token_batch,
-                                model.input_x2: shape_batch,
-                                model.input_y: label_batch,
-                                model.input_mask: mask_batch,
-                                model.max_seq_len: batch_seq_len,
-                                model.sequence_lengths: seq_len_batch,
-                                model.batch_size: batch_size,
-                                model.hidden_dropout_keep_prob: model_hidden_drop,
-                                model.input_dropout_keep_prob: model_input_drop,
-                                model.middle_dropout_keep_prob: FLAGS.middle_dropout,
-                                model.l2_penalty: FLAGS.l2,
-                                model.drop_penalty: FLAGS.regularize_drop_penalty,
-                            }
+                            model.input_x1: token_batch,
+                            model.input_x2: shape_batch,
+                            model.input_y: label_batch,
+                            model.input_mask: mask_batch,
+                            model.max_seq_len: batch_seq_len,
+                            model.sequence_lengths: seq_len_batch,
+                            model.batch_size: batch_size,
+                            model.hidden_dropout_keep_prob: model_hidden_drop,
+                            model.input_dropout_keep_prob: model_input_drop,
+                            model.middle_dropout_keep_prob: FLAGS.middle_dropout,
+                            model.l2_penalty: FLAGS.l2,
+                            model.drop_penalty: FLAGS.regularize_drop_penalty,
+                        }
                         cnn_feeds.update(char_embedding_feeds)
-                        _,  loss = sess.run([train_op, model.loss], feed_dict=cnn_feeds)
+                        _, loss = sess.run([train_op, model.loss], feed_dict=cnn_feeds)
                     elif FLAGS.model == "bilstm":
                         lstm_feed = {
                             model.input_x1: token_batch,
@@ -461,7 +464,7 @@ def main(argv):
                         _, loss = sess.run([train_op, model.loss], feed_dict=lstm_feed)
                     epoch_loss += loss
                     train_batcher._step += 1
-                return best_score, training_iteration, speed_num/speed_denom
+                return best_score, training_iteration, speed_num / speed_denom
 
             if FLAGS.evaluate_only:
                 if FLAGS.train_eval:
@@ -475,8 +478,8 @@ def main(argv):
 
             else:
                 best_score, training_iteration, train_speed = train(FLAGS.max_epochs, 0.0,
-                                                       FLAGS.hidden_dropout, FLAGS.input_dropout,
-                                                       until_convergence=FLAGS.until_convergence)
+                                                                    FLAGS.hidden_dropout, FLAGS.input_dropout,
+                                                                    until_convergence=FLAGS.until_convergence)
                 if FLAGS.model_dir:
                     print("Deserializing model: " + FLAGS.model_dir + ".tf")
                     saver.restore(sess, FLAGS.model_dir + ".tf")
@@ -485,13 +488,14 @@ def main(argv):
             sv.coord.join(threads)
             sess.close()
 
-            total_time = time.time()-training_start_time
+            total_time = time.time() - training_start_time
             if FLAGS.evaluate_only:
                 print("Testing time: %d seconds" % (total_time))
             else:
-                print("Training time: %d minutes, %d iterations (%3.2f minutes/iteration)" % (total_time/60, training_iteration, total_time/(60*training_iteration)))
+                print("Training time: %d minutes, %d iterations (%3.2f minutes/iteration)" % (total_time / 60, training_iteration, total_time / (60 * training_iteration)))
                 print("Avg training speed: %f examples/second" % (train_speed))
-                print("Best dev F1: %2.2f" % (best_score*100))
+                print("Best dev F1: %2.2f" % (best_score * 100))
+
 
 if __name__ == '__main__':
     tf.app.flags.DEFINE_string('train_dir', '', 'directory containing preprocessed training data')
