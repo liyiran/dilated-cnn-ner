@@ -1,7 +1,7 @@
 #!/bin/bash
 
 conf=$1
-if [ ! -e $conf ]; then
+if [ -z $conf ]; then
     echo "No config file specified; Exiting."
     exit 1
 fi
@@ -30,8 +30,9 @@ load_pretrained_param=""
 if [[ "$pretrained_model" != "" ]]; then
     load_pretrained_param="--load_dir $pretrained_model"
 fi
+cd ../src
 
-cmd="python src/train.py \
+cmd="python3 train.py \
 --train_dir $train_dir \
 --dev_dir $dev_dir \
 --maps_dir $maps_dir \

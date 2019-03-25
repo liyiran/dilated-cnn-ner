@@ -21,7 +21,7 @@ FLAGS = tf.app.flags.FLAGS
 
 
 def main(argv):
-    print("CUDA_VISIBLE_DEVICES=", os.environ['CUDA_VISIBLE_DEVICES'])
+    # print("CUDA_VISIBLE_DEVICES=", os.environ['CUDA_VISIBLE_DEVICES'])
 
     train_dir = FLAGS.train_dir
     dev_dir = FLAGS.dev_dir
@@ -109,7 +109,8 @@ def main(argv):
                 if word in vocab_str_id_map:
                     embeddings_used += 1
                     # shift by -1 because we are going to add a 0 constant vector for the padding later
-                    embeddings[vocab_str_id_map[word] - 1] = map(float, embedding)
+                    # embeddings[vocab_str_id_map[word] - 1] = map(float, embedding)
+                    embeddings[vocab_str_id_map[word] - 1] = [float(x) for x in embedding]
                 elif word.lower() in vocab_str_id_map:
                     embeddings_used += 1
                     embeddings[vocab_str_id_map[word.lower()] - 1] = map(float, embedding)
